@@ -76,6 +76,7 @@
 - `reminders.py` - Agent self-reminders: create/list/cancel (self-gated) (#1296) — see [Agent Self-Reminders](#agent-self-reminders-1296)
 - `files.py` - Public download endpoint for outbound agent file sharing (FILES-001)
 - `agent_rename.py` - Rename endpoint (RENAME-001)
+- `a2a.py` - A2A protocol: the authenticated per-agent card (#737) plus the **inbound server** on a separate prefix-less `a2a_server_router` — public `GET /a2a/{name}/.well-known/agent-card.json` (per-IP rate limited) + `POST /a2a/{name}` JSON-RPC (message/send, message/stream SSE, tasks/get, tasks/cancel). Exposure is opt-in per agent (`agent_ownership.a2a_exposed`, default OFF); non-exposed/inaccessible → uniform 404 (Invariant #8). `messageId` dedup is scoped per (agent, caller principal) — the field is peer-controlled and only unique per-client (ent#157)
 - `agent_ssh.py` - SSH access endpoint
 - `credentials.py` - Credential injection/export/import (CRED-002)
 - `chat.py` / `chat/` - Agent chat/activity monitoring
@@ -151,6 +152,7 @@
 - `template_service.py` - GitHub template cloning and processing
 - `agent_client.py` - HTTP client for agent container communication (chat, session, injection); hosts the transport circuit breaker — see [Circuit Breakers](#circuit-breakers-transport--dispatch-526)
 - `settings_service.py` - Centralized settings retrieval (API keys, ops config, agent quotas)
+- `a2a_gate.py` - Open-core seam for the A2A inbound allow-list: OSS registers no provider → any authenticated owner/shared caller is allowed; a private module can register one to further restrict caller identities. **Fails open** (a provider error never blocks an authenticated caller), so it is a restriction layered on auth, not a security boundary. A seam file — its comments describe the mechanism only and are grepped by `enterprise-docs-guard.yml` (#1461 class) (ent#157)
 - `operator_intake_service.py` - Fire-and-forget, once-per-install opt-in operator intake POST at first-run; owns `installation_id` (trinity-enterprise#38)
 - `agent_runtime_state.py` - Single enumeration point for every name-keyed per-agent Redis keyspace; `clear_agent_breakers` (safe on a live container) vs `clear_agent_runtime_state` (adds slots; teardown only) — see [Circuit Breakers](#circuit-breakers-transport--dispatch-526) (#1560)
 
@@ -819,7 +821,7 @@ Full flow: [cornelius-default-agent.md](feature-flows/cornelius-default-agent.md
 | GET | `/api/agents/{name}/stats` | Live telemetry |
 | GET | `/api/agents/{name}/activity` | Activity summary |
 | GET | `/api/agents/{name}/info` | Template metadata |
-| GET | `/api/agents/{name}/a2a/agent-card` | A2A v1.0 Agent Card for external orchestrator discovery (#737) |
+| GET | `/api/agents/{name}/a2a/agent-card` | A2A Agent Card (protocol `0.3.0`) for external orchestrator discovery — authenticated (`AuthorizedAgentByName`) (#737) |
 | GET | `/api/agents/{name}/files` | List workspace files (tree) |
 | GET | `/api/agents/{name}/files/download` | Download file |
 | POST | `/api/agents/{name}/files/mkdir` | Create workspace directory (#37) |
@@ -1193,6 +1195,7 @@ CREATE TABLE agent_ownership (
     file_sharing_enabled INTEGER DEFAULT 0,        -- FILES-001
     circuit_breaker_enabled INTEGER DEFAULT 0,     -- RELIABILITY-007 (#526): dispatch-breaker opt-in
     mcp_exposed INTEGER DEFAULT 0,                 -- #846: dedicated chat_with_<slug> MCP tool opt-in
+    a2a_exposed INTEGER DEFAULT 0,                 -- ent#157: A2A inbound-server exposure opt-in (default OFF)
     tts_voice_replies_enabled INTEGER DEFAULT 0,   -- epic #24/#25: outbound voice replies (shared agent-level)
     tts_voice_id TEXT,                             -- epic #24/#25: ElevenLabs voice id for spoken replies
     tts_voice_telegram_enabled INTEGER DEFAULT 1,  -- ent#117: per-channel voice-allowed flag
