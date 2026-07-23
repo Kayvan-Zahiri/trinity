@@ -2500,6 +2500,43 @@ def _migrate_agent_loops_tables(cursor, conn):
     conn.commit()
 
 
+def _migrate_agent_evaluations_table(cursor, conn):
+    """Create the agent_evaluations table + indexes (ent#206).
+
+    The behavioral-eval referee surface: a run's completion (clean-exit mirror)
+    and its separate quality score, written ONLY by the platform/evaluator, never
+    by the graded agent's key. Also defined in db/schema.py for fresh installs;
+    this handles existing installs. Idempotent. Mirrored by Alembic
+    0029_agent_evaluations for PostgreSQL (#1183 dual-track).
+    """
+    cursor.execute("PRAGMA table_info(agent_evaluations)")
+    if cursor.fetchall():
+        return
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_evaluations (
+            id TEXT PRIMARY KEY,
+            agent_name TEXT NOT NULL,
+            execution_id TEXT,
+            archetype TEXT,
+            completion INTEGER,
+            quality REAL,
+            checks_json TEXT,
+            judge_json TEXT,
+            evaluator TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (execution_id) REFERENCES schedule_executions(id)
+        )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_evaluations_agent "
+        "ON agent_evaluations(agent_name, created_at DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_evaluations_execution "
+        "ON agent_evaluations(execution_id)"
+    )
+
+
 def _migrate_agent_reminders_table(cursor, conn):
     """Create the agent_reminders table + indexes (#1296).
 
@@ -3183,4 +3220,5 @@ MIGRATIONS = [
     ("operator_queue_request_id", _migrate_operator_queue_request_id),
     ("users_github_pat", _migrate_users_github_pat),
     ("agent_reminders_table", _migrate_agent_reminders_table),
+    ("agent_evaluations_table", _migrate_agent_evaluations_table),
 ]
