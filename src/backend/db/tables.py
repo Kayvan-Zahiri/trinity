@@ -458,6 +458,15 @@ agent_reports = Table(
     Column("created_at", Text),
 )
 
+product_events = Table(
+    # Local product-event capture — activation funnel, Tier-1 (ent#184).
+    # Local-only, default-on, zero egress. INTEGER autoincrement PK.
+    "product_events",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("installation_id", Text),
+    Column("event_type", Text),
+    Column("event_context", Text),
 agent_evaluations = Table(
     "agent_evaluations",
     metadata,
@@ -813,6 +822,7 @@ slack_channel_agents = Table(
     Column("is_dm_default", Integer),
     Column("created_by", Text),
     Column("created_at", Text),
+    Column("allow_proactive", Integer),   # ent#223: per-channel proactive consent
 )
 
 slack_active_threads = Table(
