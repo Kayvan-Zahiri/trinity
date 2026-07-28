@@ -467,6 +467,9 @@ product_events = Table(
     Column("installation_id", Text),
     Column("event_type", Text),
     Column("event_context", Text),
+    Column("created_at", Text),
+)
+
 agent_evaluations = Table(
     "agent_evaluations",
     metadata,
